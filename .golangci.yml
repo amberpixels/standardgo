@@ -1,0 +1,119 @@
+# golangci-lint config — targets v2.12.x
+# Strict on correctness, quiet on style. Nothing deprecated, nothing legacy.
+version: "2"
+
+run:
+  # Output paths are relative to go.mod, not to the (temp) config file.
+  relative-path-mode: gomod
+
+formatters:
+  enable:
+    - gofumpt   # stricter gofmt
+    - goimports # drops unused imports (gci does not)
+    - gci       # import grouping
+    - golines # wraps long lines
+  settings:
+    gci:
+      # `localmodule` reads the module path from go.mod — no per-project value.
+      sections: [standard, default, localmodule]
+    golines:
+      max-len: 120
+
+linters:
+  # errcheck, govet, ineffassign, staticcheck, unused are on by default.
+  enable:
+    # --- correctness / bugs ---
+    - bodyclose               # unclosed HTTP response bodies
+    - copyloopvar             # loop-var copies (Go 1.22+)
+    - durationcheck           # duration * duration
+    - errorlint               # %w / errors.Is / errors.As correctness
+    - errname                 # ErrFoo / FooError naming
+    - exhaustive              # non-exhaustive enum switches
+    - fatcontext             # nested contexts in loops
+    - makezero                # make([]T, n) then append
+    - musttag                 # missing struct tags on (un)marshalled types
+    - nilerr                  # return nil after checking err != nil
+    - nilnesserr              # nil-vs-error confusion
+    - noctx                   # HTTP requests / sql calls without context
+    - protogetter             # use proto getters, not direct field access
+    - reassign                # reassigning package vars from other packages
+    - recvcheck               # mixed pointer/value receivers
+    - rowserrcheck            # unchecked sql.Rows.Err
+    - sqlclosecheck           # unclosed sql.Rows / sql.Stmt
+    - spancheck               # unended OTel spans
+    - testifylint             # testify misuse
+    - unqueryvet              # SELECT * detection
+    - usetesting              # t.TempDir / t.Setenv / t.Context over manual setup
+
+    # --- modernization ---
+    - modernize               # rewrite to modern Go idioms (gopls analyzers)
+    - exptostd                # x/exp funcs that are now in std
+    - usestdlibvars           # http.MethodGet over "GET"
+    - intrange                # for i := range n
+    - perfsprint              # fmt.Sprintf -> faster equivalents
+    - gocritic                # broad bug/perf/style diagnostics
+    - unconvert               # redundant conversions
+    - wastedassign            # assignments never read
+
+    # --- API hygiene ---
+    - embeddedstructfieldcheck # embedded fields separated from regular ones
+    - funcorder               # exported methods before unexported
+    - godoclint               # doc-comment correctness
+    - iotamixing              # mixing iota and explicit values in a const block
+    - nolintlint              # //nolint must be specific and explained
+    - nonamedreturns          # no naked named returns
+    - predeclared             # shadowing predeclared identifiers
+    - unparam                 # always-same / unused params
+    - revive                  # golint successor, style + naming
+    - sloglint                # log/slog consistency
+
+    # --- security ---
+    - gosec
+
+  settings:
+    # amberpixels custom linters, compiled into the standardgo binary. Declaring
+    # one here enables it; the plugin code itself is linked in via a blank import
+    # in standardgo.go. See https://github.com/amberpixels/lostfield
+    custom:
+      lostfield:
+        type: module
+        description: Validates Go type-converter funcs so every field gets used.
+
+    errcheck:
+      check-type-assertions: true
+    exhaustive:
+      default-signifies-exhaustive: true
+    gocritic:
+      enable-all: true
+      disabled-checks:
+        - hugeParam        # noisy without profiling
+        - rangeValCopy
+        - whyNoLint        # nolintlint covers this
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment   # noisy; enable per-project if memory matters
+        - shadow           # near-100% false positives on shadowed `err`
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-no-explanation: []
+    revive:
+      enable-all-rules: false
+      rules:
+        - name: unused-parameter
+          disabled: true
+
+  exclusions:
+    warn-unused: true
+    presets:
+      - std-error-handling
+      - common-false-positives
+    rules:
+      - path: '_test\.go'
+        linters:
+          - bodyclose
+          - errcheck
+          - gosec
+          - noctx
+          - unqueryvet

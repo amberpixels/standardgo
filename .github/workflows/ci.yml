@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Self-lint
+        run: go run ./cmd/standardgo ./...
+
+  # The point of bundling the engine is that upgrading it is a reviewed event
+  # rather than a surprise. These checks run on Dependabot's bump PR and fail
+  # it if the new engine would ship something we do not want.
+  ruleset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Ruleset loads against this engine
+        run: go run ./cmd/standardgo config verify
+
+      - name: No deprecated linters enabled
+        run: |
+          enabled=$(go run ./cmd/standardgo linters \
+            | sed -n '/^Enabled/,/^Disabled/p')
+          if echo "$enabled" | grep -i 'deprecated'; then
+            echo "::error::The ruleset enables a linter this engine has deprecated (see above)."
+            exit 1
+          fi
+          echo "No deprecated linters enabled."
+
+      - name: Report linters the engine added since the last bump
+        run: |
+          go run ./cmd/standardgo linters \
+            | sed -n '/^Disabled/,$p' \
+            | grep -oE '^[a-z0-9_]+' \
+            | grep -vxFf <(grep -oE '^\s+#?\s*- [a-z0-9_]+' .golangci.yml \
+                | grep -oE '[a-z0-9_]+$' | sort -u) \
+            > /tmp/unconsidered || true
+          if [ -s /tmp/unconsidered ]; then
+            echo "::notice::Linters this engine offers that the ruleset has never taken a position on:"
+            cat /tmp/unconsidered
+          else
+            echo "Every linter this engine offers is either enabled or explicitly declined."
+          fi

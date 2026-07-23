@@ -1,0 +1,20 @@
+version: 2
+
+updates:
+  # The golangci-lint engine is an ordinary Go dependency here, so keeping the
+  # ruleset current is a dependency bump like any other: Dependabot opens the
+  # PR, CI proves the ruleset still loads and still finds what it should, and
+  # tagging the release is what ships it to every consuming project.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    labels:
+      - engine
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

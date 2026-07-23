@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 80" width="860" height="80" xml:space="preserve">
+  <style>
+    text { font-family: 'Menlo', 'Consolas', 'Courier New', monospace; font-size: 20px; white-space: pre; }
+  </style>
+  <rect width="860" height="80" rx="6" fill="transparent"/>
+  <!-- S T A N D A R D G O — gold standard (standardJS / Standard Ruby homage), GO in gopher blue #79D4FD -->
+  <!-- Row 1 -->
+  <text y="28">
+    <tspan fill="#F3DF49"> ░█▀▀▀█</tspan><tspan fill="#EDD53E"> ▀▀█▀▀</tspan><tspan fill="#E7CB34"> ░█▀▀█</tspan><tspan fill="#E0C02A"> ░█▄─░█</tspan><tspan fill="#D9B421"> ░█▀▀▄</tspan><tspan fill="#D1A719"> ░█▀▀█</tspan><tspan fill="#C89A12"> ░█▀▀█</tspan><tspan fill="#BE8C0C"> ░█▀▀▄</tspan><tspan fill="#79D4FD"> ░█▀▀█</tspan><tspan fill="#79D4FD"> ░█▀▀▀█</tspan>
+  </text>
+  <!-- Row 2 -->
+  <text y="52">
+    <tspan fill="#F3DF49"> ─▀▀▀▄▄</tspan><tspan fill="#EDD53E"> ─░█──</tspan><tspan fill="#E7CB34"> ░█▄▄█</tspan><tspan fill="#E0C02A"> ░█░█░█</tspan><tspan fill="#D9B421"> ░█─░█</tspan><tspan fill="#D1A719"> ░█▄▄█</tspan><tspan fill="#C89A12"> ░█▄▄▀</tspan><tspan fill="#BE8C0C"> ░█─░█</tspan><tspan fill="#79D4FD"> ░█─▄▄</tspan><tspan fill="#79D4FD"> ░█──░█</tspan>
+  </text>
+  <!-- Row 3 -->
+  <text y="76">
+    <tspan fill="#F3DF49"> ░█▄▄▄█</tspan><tspan fill="#EDD53E"> ─░█──</tspan><tspan fill="#E7CB34"> ░█─░█</tspan><tspan fill="#E0C02A"> ░█──▀█</tspan><tspan fill="#D9B421"> ░█▄▄▀</tspan><tspan fill="#D1A719"> ░█─░█</tspan><tspan fill="#C89A12"> ░█─░█</tspan><tspan fill="#BE8C0C"> ░█▄▄▀</tspan><tspan fill="#79D4FD"> ░█▄▄█</tspan><tspan fill="#79D4FD"> ░█▄▄▄█</tspan>
+  </text>
+</svg>
