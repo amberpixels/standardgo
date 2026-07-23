@@ -45,13 +45,20 @@ Delete your `.golangci.yml` after adopting. It will not be read.
 # lint the current module
 go tool standardgo
 
-# fix what can be fixed, then reformat (this order - fixers can leave imports dangling)
+# fix everything fixable, formatting included
 go tool standardgo ./... --fix
+
+# formatting only - a faster subset of --fix, good for editor-on-save
 go tool standardgo fmt ./...
 
 # what is actually enabled
 go tool standardgo linters
 ```
+
+`run` reports formatting problems as ordinary issues, and `--fix` applies formatter
+and linter fixes alike - including cleaning up an import a fixer just orphaned. So
+`--fix` is a superset of `fmt`, and there is no ordering to remember. `fmt` exists
+because it skips the linters entirely and costs about half as much.
 
 Upgrading the rules everywhere is one command per repo:
 
