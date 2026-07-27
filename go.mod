@@ -3,7 +3,8 @@ module github.com/amberpixels/standardgo
 go 1.26
 
 require (
-	github.com/amberpixels/lostfield v0.1.1
+	github.com/amberpixels/k1 v0.2.1
+	github.com/amberpixels/lostfield v0.2.0
 	github.com/golangci/golangci-lint/v2 v2.12.2
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -36,7 +37,6 @@ require (
 	github.com/alfatraining/structtag v1.0.0 // indirect
 	github.com/alingse/asasalint v0.0.11 // indirect
 	github.com/alingse/nilnesserr v0.2.0 // indirect
-	github.com/amberpixels/k1 v0.2.1 // indirect
 	github.com/ashanbrown/forbidigo/v2 v2.3.1 // indirect
 	github.com/ashanbrown/makezero/v2 v2.2.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
