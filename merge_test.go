@@ -41,6 +41,66 @@ func TestMergeAddsUnconfiguredSettings(t *testing.T) {
 	}
 }
 
+// TestMergeAddsPluginSettings covers the case `custom` made impossible before:
+// the shared ruleset declares lostfield but never tunes it, so supplying its
+// settings is an addition, not an override.
+func TestMergeAddsPluginSettings(t *testing.T) {
+	out, err := standardgo.Merge(standardgo.Config, []byte(
+		"linters:\n  settings:\n    custom:\n      lostfield:\n        settings:\n"+
+			"          exclude-fields: ['^ID$', CreatedAt]\n"))
+	if err != nil {
+		t.Fatalf("configuring a declared-but-unconfigured plugin should be allowed: %v", err)
+	}
+	if !strings.Contains(string(out), "exclude-fields") {
+		t.Error("plugin settings were not merged in")
+	}
+	// The declaration the ruleset owns must survive the merge, or the engine
+	// stops recognising the plugin at all.
+	if !strings.Contains(string(out), "type: module") {
+		t.Error("merging settings dropped the locked plugin declaration")
+	}
+}
+
+func TestMergeRejectsPluginIdentityOverride(t *testing.T) {
+	for _, key := range []string{"type", "path", "description"} {
+		t.Run(key, func(t *testing.T) {
+			_, err := standardgo.Merge(standardgo.Config, []byte(
+				"linters:\n  settings:\n    custom:\n      lostfield:\n        "+key+": elsewhere\n"))
+			if err == nil {
+				t.Fatalf("overlay must not set %q on a compiled-in plugin", key)
+			}
+		})
+	}
+}
+
+func TestMergeRejectsUnknownPlugin(t *testing.T) {
+	_, err := standardgo.Merge(standardgo.Config, []byte(
+		"linters:\n  settings:\n    custom:\n      nosuchplugin:\n        settings:\n          x: 1\n"))
+	if err == nil {
+		t.Fatal("plugins are compiled in, so an unknown one must be refused")
+	}
+	if !strings.Contains(err.Error(), "lostfield") {
+		t.Errorf("error should name the plugins that are bundled: %v", err)
+	}
+}
+
+// TestMergeRejectsConfiguredPluginOverride pins the other half of the rule: the
+// namespace is merged per plugin, but a plugin the ruleset has actually tuned
+// is as closed as any ordinary linter. The locked config is synthesised because
+// the real ruleset deliberately configures no plugin today.
+func TestMergeRejectsConfiguredPluginOverride(t *testing.T) {
+	locked := []byte(
+		"version: \"2\"\nlinters:\n  settings:\n    custom:\n      lostfield:\n" +
+			"        type: module\n        settings:\n          min-similarity: 0.4\n")
+
+	_, err := standardgo.Merge(locked, []byte(
+		"linters:\n  settings:\n    custom:\n      lostfield:\n        settings:\n"+
+			"          exclude-fields: ['^ID$']\n"))
+	if err == nil {
+		t.Fatal("a plugin the shared ruleset configures must not be overridden")
+	}
+}
+
 func TestMergeAddsLinters(t *testing.T) {
 	out, err := standardgo.Merge(standardgo.Config, []byte("linters:\n  enable: [dupl]\n"))
 	if err != nil {

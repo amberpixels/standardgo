@@ -3,6 +3,8 @@ package standardgo
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/amberpixels/k1/quick"
 	"gopkg.in/yaml.v3"
@@ -107,6 +109,13 @@ func widen(ss []string) []any {
 	return out
 }
 
+// customKey is the settings key holding every bundled plugin's configuration.
+const customKey = "custom"
+
+// pluginIdentity are the keys that decide which code a plugin name binds to.
+// An overlay may tune a bundled plugin, never swap out what backs it.
+var pluginIdentity = []string{"type", "path", "description", "original-url"}
+
 // addSettings adds settings for linters the shared config does not configure.
 func addSettings(lint, add map[string]any) error {
 	if len(add) == 0 {
@@ -119,6 +128,14 @@ func addSettings(lint, add map[string]any) error {
 	}
 
 	for name, value := range add {
+		if name == customKey {
+			if err := addCustomSettings(settings, value); err != nil {
+				return err
+			}
+
+			continue
+		}
+
 		if _, taken := settings[name]; taken {
 			return fmt.Errorf(
 				"%s may not override settings for %q, which the shared ruleset already configures",
@@ -127,6 +144,76 @@ func addSettings(lint, add map[string]any) error {
 		settings[name] = value
 	}
 	lint["settings"] = settings
+
+	return nil
+}
+
+// addCustomSettings merges plugin settings into the locked custom namespace.
+//
+// `custom` is not one linter's settings, it is the map holding every bundled
+// plugin's. Refusing the key outright would lock every plugin at once,
+// including ones the shared ruleset only declares and never tunes, so the
+// add-never-override rule is applied one level down instead: per plugin.
+//
+// A plugin's own `settings` block stays a unit, exactly like an ordinary
+// linter's settings. Once the shared ruleset tunes a plugin, that plugin is
+// closed. The namespace is the special case, not what sits inside it.
+func addCustomSettings(settings map[string]any, value any) error {
+	add, ok := value.(map[string]any)
+	if !ok {
+		return fmt.Errorf(
+			"%s: linters.settings.custom must map a plugin name to its settings", OverlayFile)
+	}
+
+	plugins, _ := settings[customKey].(map[string]any)
+	if plugins == nil {
+		plugins = map[string]any{}
+	}
+
+	for name, value := range add {
+		declared, ok := plugins[name]
+		if !ok {
+			return fmt.Errorf(
+				"%s: unknown plugin %q. Plugins are compiled into this binary, so an overlay may"+
+					" configure the bundled ones (%v) but cannot add another",
+				OverlayFile, name, slices.Sorted(maps.Keys(plugins)))
+		}
+
+		locked, ok := declared.(map[string]any)
+		if !ok {
+			return fmt.Errorf("locked config declares plugin %q as %T, want a map", name, declared)
+		}
+
+		fields, ok := value.(map[string]any)
+		if !ok {
+			return fmt.Errorf("%s: settings for plugin %q must be a map", OverlayFile, name)
+		}
+
+		if err := addPluginFields(locked, fields, name); err != nil {
+			return err
+		}
+	}
+	settings[customKey] = plugins
+
+	return nil
+}
+
+// addPluginFields merges one plugin's overlay keys onto its locked declaration.
+func addPluginFields(locked, add map[string]any, name string) error {
+	for key, value := range add {
+		if slices.Contains(pluginIdentity, key) {
+			return fmt.Errorf(
+				"%s may not set %q on plugin %q; that decides what backs the plugin, and the"+
+					" plugin is compiled into this binary",
+				OverlayFile, key, name)
+		}
+		if _, taken := locked[key]; taken {
+			return fmt.Errorf(
+				"%s may not override %q for plugin %q, which the shared ruleset already configures",
+				OverlayFile, key, name)
+		}
+		locked[key] = value
+	}
 
 	return nil
 }

@@ -123,6 +123,34 @@ statically, so a project **cannot** add a plugin to an already-built standardgo 
 has to live here. In exchange you never touch `.custom-gcl.yml` or run `golangci-lint
 custom`: standardgo already is the custom binary that mechanism exists to produce.
 
+### Configuring a bundled plugin
+
+Some plugins only make sense once a project tells them where to look. `lostfield` is one:
+what counts as a converter, and which fields a persistence layer manages, are per-project
+facts no shared default can guess. So a project may supply settings for a plugin the shared
+ruleset declares but does not tune:
+
+```yaml
+# .standardgo.yml
+linters:
+  settings:
+    custom:
+      lostfield:
+        settings:
+          only-converters: ["To*", "From*"]
+          exclude-fields: ["^ID$", CreatedAt, UpdatedAt, DeletedAt]
+          ignore-tags: ['lostfield:"ignore"']
+```
+
+Note that these are YAML lists. The comma-separated form (`exclude-fields: 'A,B'`) is
+`lostfield`'s CLI-flag syntax and is not valid here. Unknown keys and out-of-range values
+are rejected at startup rather than ignored, so a typo fails loudly.
+
+`type`, `path` and `description` stay locked. Settings are an addition; those three decide
+what code backs the plugin, and the plugin is compiled into this binary. The same
+already-configured rule applies as everywhere else: once the shared ruleset tunes a plugin,
+that plugin is closed.
+
 ## How It Works
 
 `.golangci.yml` is embedded with `go:embed`. On each run standardgo merges `.standardgo.yml`
