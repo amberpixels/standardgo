@@ -17,14 +17,11 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Build
-        run: go build ./...
+      - uses: extractions/setup-just@v3
 
-      - name: Test
-        run: go test ./...
-
-      - name: Self-lint
-        run: go run ./cmd/standardgo ./...
+      # build + self-lint + test + `config verify`. Recipes live in the justfile so
+      # the same command runs here and locally.
+      - run: just ci
 
   # The point of bundling the engine is that upgrading it is a reviewed event
   # rather than a surprise. These checks run on Dependabot's bump PR and fail

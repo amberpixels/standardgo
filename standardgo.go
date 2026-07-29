@@ -21,7 +21,10 @@ import (
 	//
 	// This replaces the .custom-gcl.yml / `golangci-lint custom` dance: standardgo
 	// already is the custom binary that mechanism exists to produce.
-	_ "github.com/amberpixels/lostfield"
+	//
+	// Import /plugin, not the module root: the root holds the analyzer alone and
+	// registers nothing, so that libraries importing lostfield do not carry this.
+	_ "github.com/amberpixels/lostfield/plugin"
 )
 
 // Config is the locked golangci-lint configuration.
