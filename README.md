@@ -19,7 +19,7 @@ Every project that copies a `.golangci.yml` eventually has a different one. Plac
 go unreplaced, a linter gets commented out during a bad afternoon, and a year later no two
 repos agree on what "clean" means.
 
-standardgo removes the file. The ruleset - 46 linters and 4 formatters - is compiled into
+standardgo removes the file. The ruleset - 46 linters and 3 formatters - is compiled into
 this binary along with the golangci-lint engine itself, so a project pins both with one
 line in `go.mod` and carries no lint config of its own.
 

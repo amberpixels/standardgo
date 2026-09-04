@@ -7,9 +7,16 @@ run:
   relative-path-mode: gomod
 
 formatters:
+  # goimports is deliberately absent. x/tools 0.48 made it far more expensive,
+  # and it dominates a cold run: on r3, 11.6s with x/tools pinned back to 0.47,
+  # 30.5s on 0.49, and 3.8s once goimports is dropped. gofumpt and gci already
+  # reproduce its formatting byte for byte - verified on import blocks with std,
+  # third-party and local mixed into one unsorted group. All it adds on top is
+  # removing unused imports and adding missing ones, and both of those are
+  # compile errors the build reports anyway. Do not re-add it for the grouping;
+  # gci owns that.
   enable:
     - gofumpt   # stricter gofmt
-    - goimports # drops unused imports (gci does not)
     - gci       # import grouping
     - golines # wraps long lines
   settings:
