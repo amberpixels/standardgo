@@ -12,16 +12,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
 	"slices"
 	"strings"
+	"syscall"
 
 	"github.com/golangci/golangci-lint/v2/pkg/commands"
 	"github.com/golangci/golangci-lint/v2/pkg/exitcodes"
@@ -41,13 +44,27 @@ var passthrough = []string{
 var configless = []string{"cache", "custom", "help", "version"}
 
 func main() {
-	if err := run(); err != nil {
-		fmt.Fprintln(os.Stderr, "standardgo:", err)
-		os.Exit(exitcodes.Failure)
-	}
+	os.Exit(start())
 }
 
-func run() error {
+// start is where the work happens, so that main holds the one os.Exit and this
+// function's deferred cleanup actually runs.
+func start() int {
+	// Resolving a preset shells out to the go command, which can be slow on a
+	// cold module cache. Ctrl-C should kill that, not wait for it.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := run(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, "standardgo:", err)
+
+		return exitcodes.Failure
+	}
+
+	return 0
+}
+
+func run(ctx context.Context) error {
 	args := os.Args[1:]
 
 	// Refuse --config outright. Allowing it would let any project swap the
@@ -69,7 +86,7 @@ func run() error {
 	engineArgs := append([]string{os.Args[0], sub}, args...)
 
 	if !slices.Contains(configless, sub) {
-		cfg, err := writeConfig()
+		cfg, err := writeConfig(ctx)
 		if err != nil {
 			return err
 		}
@@ -88,13 +105,22 @@ func run() error {
 // The filename is derived from the content hash, so repeated runs reuse one
 // file instead of accumulating temp files. That matters because the engine
 // exits the process on lint failure and never unwinds a deferred cleanup.
-func writeConfig() (string, error) {
+func writeConfig(ctx context.Context) (string, error) {
 	conf := standardgo.Config
 
 	overlay, err := os.ReadFile(standardgo.OverlayFile)
 	switch {
 	case err == nil:
-		if conf, err = standardgo.Merge(conf, overlay); err != nil {
+		// Only presets need either of these, but resolving the module path here
+		// keeps Merge a function of its inputs rather than something that reaches
+		// for the filesystem halfway through a config transform.
+		mod, merr := standardgo.ModulePath(".")
+		if merr != nil {
+			return "", merr
+		}
+
+		proj := standardgo.Project{Module: mod, Resolve: standardgo.ModuleDir}
+		if conf, err = standardgo.Merge(ctx, conf, overlay, proj); err != nil {
 			return "", err
 		}
 	case !os.IsNotExist(err):

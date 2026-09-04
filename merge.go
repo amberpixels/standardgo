@@ -1,13 +1,14 @@
 package standardgo
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
 	"slices"
 
 	"github.com/amberpixels/k1/quick"
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 )
 
 // OverlayFile is the project-local overlay read from the working directory.
@@ -25,6 +26,12 @@ const OverlayFile = ".standardgo.yml"
 // The one sanctioned way to get softer is Ignore, and it is path-scoped: a
 // linter may be silenced under a glob, never globally.
 type Overlay struct {
+	// Presets are module paths, each naming a module that publishes a
+	// standardgo-preset.yml. A preset is an overlay a project references instead
+	// of pasting, so a convention shared across repos (its layering rules, say)
+	// has one definition, versioned where it is defined rather than here.
+	Presets []string `yaml:"presets"`
+
 	Linters struct {
 		Enable   []string       `yaml:"enable"`
 		Disable  []string       `yaml:"disable"`
@@ -43,7 +50,10 @@ type IgnoreRule struct {
 // Merge applies overlay onto the locked config and returns the result.
 // It returns an error rather than silently dropping anything the overlay is
 // not permitted to do, so a rejected override is visible instead of confusing.
-func Merge(locked, overlay []byte) ([]byte, error) {
+//
+// proj says which module is being linted and how to find the presets it names;
+// resolving one runs the go command, which is what ctx is for.
+func Merge(ctx context.Context, locked, overlay []byte, proj Project) ([]byte, error) {
 	var ov Overlay
 	if err := yaml.Unmarshal(overlay, &ov); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", OverlayFile, err)
@@ -66,16 +76,47 @@ func Merge(locked, overlay []byte) ([]byte, error) {
 		return nil, errors.New("locked config has no linters section")
 	}
 
-	addLinters(lint, ov.Linters.Enable)
+	// Presets are applied before the project's own additions so that a project
+	// which also hand-writes what a preset provides is told which preset already
+	// owns the key, instead of being refused by the shared ruleset it never
+	// touched. owners carries that provenance across the two passes.
+	owners := map[string]string{}
 
-	if err := addSettings(lint, ov.Linters.Settings); err != nil {
-		return nil, err
+	for _, name := range ov.Presets {
+		preset, err := loadPreset(ctx, name, proj)
+		if err != nil {
+			return nil, err
+		}
+		if err := apply(lint, preset, owners, fmt.Sprintf("preset %q", name)); err != nil {
+			return nil, err
+		}
 	}
-	if err := addIgnores(lint, ov.Ignore); err != nil {
+
+	if err := apply(lint, &ov, owners, OverlayFile); err != nil {
 		return nil, err
 	}
 
 	return yaml.Marshal(base)
+}
+
+// apply merges one overlay's additions into the locked linters section.
+func apply(lint map[string]any, ov *Overlay, owners map[string]string, src string) error {
+	addLinters(lint, ov.Linters.Enable)
+
+	if err := addSettings(lint, ov.Linters.Settings, owners, src); err != nil {
+		return err
+	}
+
+	return addIgnores(lint, ov.Ignore, src)
+}
+
+// ownerOf names whatever already holds a key, for a refusal message.
+func ownerOf(owners map[string]string, key string) string {
+	if src, ok := owners[key]; ok {
+		return src
+	}
+
+	return "the shared ruleset"
 }
 
 // addLinters enables extra linters. Re-enabling an already-locked linter is a
@@ -117,7 +158,7 @@ const customKey = "custom"
 var pluginIdentity = []string{"type", "path", "description", "original-url"}
 
 // addSettings adds settings for linters the shared config does not configure.
-func addSettings(lint, add map[string]any) error {
+func addSettings(lint, add map[string]any, owners map[string]string, src string) error {
 	if len(add) == 0 {
 		return nil
 	}
@@ -129,7 +170,7 @@ func addSettings(lint, add map[string]any) error {
 
 	for name, value := range add {
 		if name == customKey {
-			if err := addCustomSettings(settings, value); err != nil {
+			if err := addCustomSettings(settings, value, owners, src); err != nil {
 				return err
 			}
 
@@ -138,10 +179,11 @@ func addSettings(lint, add map[string]any) error {
 
 		if _, taken := settings[name]; taken {
 			return fmt.Errorf(
-				"%s may not override settings for %q, which the shared ruleset already configures",
-				OverlayFile, name)
+				"%s may not override settings for %q, which %s already configures",
+				src, name, ownerOf(owners, name))
 		}
 		settings[name] = value
+		owners[name] = src
 	}
 	lint["settings"] = settings
 
@@ -158,11 +200,11 @@ func addSettings(lint, add map[string]any) error {
 // A plugin's own `settings` block stays a unit, exactly like an ordinary
 // linter's settings. Once the shared ruleset tunes a plugin, that plugin is
 // closed. The namespace is the special case, not what sits inside it.
-func addCustomSettings(settings map[string]any, value any) error {
+func addCustomSettings(settings map[string]any, value any, owners map[string]string, src string) error {
 	add, ok := value.(map[string]any)
 	if !ok {
 		return fmt.Errorf(
-			"%s: linters.settings.custom must map a plugin name to its settings", OverlayFile)
+			"%s: linters.settings.custom must map a plugin name to its settings", src)
 	}
 
 	plugins, _ := settings[customKey].(map[string]any)
@@ -176,7 +218,7 @@ func addCustomSettings(settings map[string]any, value any) error {
 			return fmt.Errorf(
 				"%s: unknown plugin %q. Plugins are compiled into this binary, so an overlay may"+
 					" configure the bundled ones (%v) but cannot add another",
-				OverlayFile, name, slices.Sorted(maps.Keys(plugins)))
+				src, name, slices.Sorted(maps.Keys(plugins)))
 		}
 
 		locked, ok := declared.(map[string]any)
@@ -186,10 +228,10 @@ func addCustomSettings(settings map[string]any, value any) error {
 
 		fields, ok := value.(map[string]any)
 		if !ok {
-			return fmt.Errorf("%s: settings for plugin %q must be a map", OverlayFile, name)
+			return fmt.Errorf("%s: settings for plugin %q must be a map", src, name)
 		}
 
-		if err := addPluginFields(locked, fields, name); err != nil {
+		if err := addPluginFields(locked, fields, name, owners, src); err != nil {
 			return err
 		}
 	}
@@ -199,27 +241,30 @@ func addCustomSettings(settings map[string]any, value any) error {
 }
 
 // addPluginFields merges one plugin's overlay keys onto its locked declaration.
-func addPluginFields(locked, add map[string]any, name string) error {
+func addPluginFields(locked, add map[string]any, name string, owners map[string]string, src string) error {
 	for key, value := range add {
 		if slices.Contains(pluginIdentity, key) {
 			return fmt.Errorf(
 				"%s may not set %q on plugin %q; that decides what backs the plugin, and the"+
 					" plugin is compiled into this binary",
-				OverlayFile, key, name)
+				src, key, name)
 		}
+
+		owned := customKey + "." + name + "." + key
 		if _, taken := locked[key]; taken {
 			return fmt.Errorf(
-				"%s may not override %q for plugin %q, which the shared ruleset already configures",
-				OverlayFile, key, name)
+				"%s may not override %q for plugin %q, which %s already configures",
+				src, key, name, ownerOf(owners, owned))
 		}
 		locked[key] = value
+		owners[owned] = src
 	}
 
 	return nil
 }
 
 // addIgnores appends path-scoped exclusions.
-func addIgnores(lint map[string]any, ignores []IgnoreRule) error {
+func addIgnores(lint map[string]any, ignores []IgnoreRule, src string) error {
 	if len(ignores) == 0 {
 		return nil
 	}
@@ -235,10 +280,10 @@ func addIgnores(lint map[string]any, ignores []IgnoreRule) error {
 		switch {
 		case ig.Path == "":
 			return fmt.Errorf(
-				"%s: ignore entry needs a path; a bare linter list would disable it globally", OverlayFile)
+				"%s: ignore entry needs a path; a bare linter list would disable it globally", src)
 		case len(ig.Linters) == 0:
 			return fmt.Errorf(
-				"%s: ignore entry for %q must name the linters it silences", OverlayFile, ig.Path)
+				"%s: ignore entry for %q must name the linters it silences", src, ig.Path)
 		}
 
 		rules = append(rules, map[string]any{

@@ -1,0 +1,14 @@
+# Fixture standing in for a module that publishes a preset.
+linters:
+  enable:
+    - depguard
+
+  settings:
+    depguard:
+      rules:
+        layering:
+          files:
+            - "**/internal/business/**"
+          deny:
+            - pkg: ${MODULE}/internal/application
+              desc: "business must not import application"

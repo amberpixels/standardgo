@@ -111,6 +111,57 @@ That sounds arbitrary until you try to define "stricter" for an arbitrary settin
 different `gocritic` check set stricter? Nobody can say. "Already configured" is decidable,
 so that is the line.
 
+## Presets
+
+A convention shared across repos should have one definition, not one copy per project. A
+preset is a `standardgo-preset.yml` published by a module you already depend on:
+
+```sh
+go get github.com/amberpixels/dcba
+```
+
+```yaml
+# .standardgo.yml
+presets:
+  - github.com/amberpixels/dcba
+```
+
+Those two lines expand to the full depguard ruleset enforcing
+[DCBA](https://github.com/amberpixels/dcba) layering - three rules, ten deny entries - and
+enable `depguard` along with it. Any `${MODULE}` in the preset is rewritten to the module
+path from your `go.mod`, which is what makes such a preset shareable at all: depguard
+matches deny entries as import-path **prefixes** with no globbing, so a layering rule
+cannot name the packages it forbids until it knows the module it lands in.
+
+standardgo does not know what presets exist. It resolves the module path you name through
+**your** module graph, so a preset is versioned where it is defined and upgraded with
+`go get`, not with a standardgo release. That also means it is pinned in your `go.mod`,
+checksummed in your `go.sum`, and served from the module cache: a preset cannot change what
+your project enforces without a diff someone approved. Naming a module you have not
+required is refused, with the `go get` to fix it.
+
+Because `go mod tidy` drops a requirement nothing imports, a preset module should be blank
+imported somewhere - dcba's `internal/doc.go` template does this, which is the natural home
+for it: the package that follows the convention declares the dependency on it.
+
+A preset is written in the `.standardgo.yml` shape and goes through the same merge, so it
+is bound by the same add-never-override rules: it cannot disable a linter, cannot override
+what the shared ruleset configures, and cannot nest another preset.
+
+Naming a preset **and** hand-writing what it provides is refused rather than merged, so a
+project never half-inherits a convention:
+
+```
+standardgo: .standardgo.yml may not override settings for "depguard",
+which preset "github.com/amberpixels/dcba" already configures
+```
+
+### Publishing one
+
+Put a `standardgo-preset.yml` at the root of a module, written exactly like a
+`.standardgo.yml`, and use `${MODULE}` wherever the consuming project's module path
+belongs. There is no registry to add it to.
+
 ## Custom Linters
 
 Alongside the upstream linters, standardgo ships amberpixels' own:
@@ -154,9 +205,9 @@ that plugin is closed.
 ## How It Works
 
 `.golangci.yml` is embedded with `go:embed`. On each run standardgo merges `.standardgo.yml`
-if present, writes the result to a temp file named after its content hash, and hands it to
-golangci-lint's `commands.Execute`, which is linked into this binary rather than shelled
-out to.
+if present - presets first, then the project's own additions - writes the result to a temp
+file named after its content hash, and hands it to golangci-lint's `commands.Execute`,
+which is linked into this binary rather than shelled out to.
 
 Bundling the engine is what makes results reproducible: a project cannot lint differently
 on a laptop and in CI, because there is no second copy of golangci-lint to disagree with.

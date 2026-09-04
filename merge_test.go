@@ -4,13 +4,18 @@ import (
 	"strings"
 	"testing"
 
-	"gopkg.in/yaml.v3"
+	"go.yaml.in/yaml/v3"
 
 	"github.com/amberpixels/standardgo"
 )
 
 func TestMergeRejectsDisable(t *testing.T) {
-	_, err := standardgo.Merge(standardgo.Config, []byte("linters:\n  disable: [gosec]\n"))
+	_, err := standardgo.Merge(
+		t.Context(),
+		standardgo.Config,
+		[]byte("linters:\n  disable: [gosec]\n"),
+		standardgo.Project{},
+	)
 	if err == nil {
 		t.Fatal("expected disabling a locked linter to be refused")
 	}
@@ -21,8 +26,8 @@ func TestMergeRejectsDisable(t *testing.T) {
 
 func TestMergeRejectsSettingsOverride(t *testing.T) {
 	// gocritic is configured by the shared ruleset, so the overlay may not touch it.
-	_, err := standardgo.Merge(standardgo.Config, []byte(
-		"linters:\n  settings:\n    gocritic:\n      enable-all: false\n"))
+	_, err := standardgo.Merge(t.Context(), standardgo.Config, []byte(
+		"linters:\n  settings:\n    gocritic:\n      enable-all: false\n"), standardgo.Project{})
 	if err == nil {
 		t.Fatal("expected overriding a locked linter's settings to be refused")
 	}
@@ -31,8 +36,9 @@ func TestMergeRejectsSettingsOverride(t *testing.T) {
 func TestMergeAddsUnconfiguredSettings(t *testing.T) {
 	// depguard is enabled but not configured by the shared ruleset, so a
 	// project may supply its own rules for it.
-	out, err := standardgo.Merge(standardgo.Config, []byte(
-		"linters:\n  settings:\n    depguard:\n      rules:\n        main:\n          files: [\"**/x/**\"]\n"))
+	out, err := standardgo.Merge(t.Context(), standardgo.Config, []byte(
+		"linters:\n  settings:\n    depguard:\n      rules:\n        main:\n          files: [\"**/x/**\"]\n",
+	), standardgo.Project{})
 	if err != nil {
 		t.Fatalf("adding settings for an unconfigured linter should be allowed: %v", err)
 	}
@@ -45,9 +51,9 @@ func TestMergeAddsUnconfiguredSettings(t *testing.T) {
 // the shared ruleset declares lostfield but never tunes it, so supplying its
 // settings is an addition, not an override.
 func TestMergeAddsPluginSettings(t *testing.T) {
-	out, err := standardgo.Merge(standardgo.Config, []byte(
+	out, err := standardgo.Merge(t.Context(), standardgo.Config, []byte(
 		"linters:\n  settings:\n    custom:\n      lostfield:\n        settings:\n"+
-			"          exclude-fields: ['^ID$', CreatedAt]\n"))
+			"          exclude-fields: ['^ID$', CreatedAt]\n"), standardgo.Project{})
 	if err != nil {
 		t.Fatalf("configuring a declared-but-unconfigured plugin should be allowed: %v", err)
 	}
@@ -64,8 +70,9 @@ func TestMergeAddsPluginSettings(t *testing.T) {
 func TestMergeRejectsPluginIdentityOverride(t *testing.T) {
 	for _, key := range []string{"type", "path", "description"} {
 		t.Run(key, func(t *testing.T) {
-			_, err := standardgo.Merge(standardgo.Config, []byte(
-				"linters:\n  settings:\n    custom:\n      lostfield:\n        "+key+": elsewhere\n"))
+			_, err := standardgo.Merge(t.Context(), standardgo.Config, []byte(
+				"linters:\n  settings:\n    custom:\n      lostfield:\n        "+key+": elsewhere\n",
+			), standardgo.Project{})
 			if err == nil {
 				t.Fatalf("overlay must not set %q on a compiled-in plugin", key)
 			}
@@ -74,8 +81,9 @@ func TestMergeRejectsPluginIdentityOverride(t *testing.T) {
 }
 
 func TestMergeRejectsUnknownPlugin(t *testing.T) {
-	_, err := standardgo.Merge(standardgo.Config, []byte(
-		"linters:\n  settings:\n    custom:\n      nosuchplugin:\n        settings:\n          x: 1\n"))
+	_, err := standardgo.Merge(t.Context(), standardgo.Config, []byte(
+		"linters:\n  settings:\n    custom:\n      nosuchplugin:\n        settings:\n          x: 1\n",
+	), standardgo.Project{})
 	if err == nil {
 		t.Fatal("plugins are compiled in, so an unknown one must be refused")
 	}
@@ -93,16 +101,21 @@ func TestMergeRejectsConfiguredPluginOverride(t *testing.T) {
 		"version: \"2\"\nlinters:\n  settings:\n    custom:\n      lostfield:\n" +
 			"        type: module\n        settings:\n          min-similarity: 0.4\n")
 
-	_, err := standardgo.Merge(locked, []byte(
+	_, err := standardgo.Merge(t.Context(), locked, []byte(
 		"linters:\n  settings:\n    custom:\n      lostfield:\n        settings:\n"+
-			"          exclude-fields: ['^ID$']\n"))
+			"          exclude-fields: ['^ID$']\n"), standardgo.Project{})
 	if err == nil {
 		t.Fatal("a plugin the shared ruleset configures must not be overridden")
 	}
 }
 
 func TestMergeAddsLinters(t *testing.T) {
-	out, err := standardgo.Merge(standardgo.Config, []byte("linters:\n  enable: [dupl]\n"))
+	out, err := standardgo.Merge(
+		t.Context(),
+		standardgo.Config,
+		[]byte("linters:\n  enable: [dupl]\n"),
+		standardgo.Project{},
+	)
 	if err != nil {
 		t.Fatalf("adding a linter should be allowed: %v", err)
 	}
@@ -114,7 +127,12 @@ func TestMergeAddsLinters(t *testing.T) {
 // TestMergeReEnableIsNoOp pins the dedup behaviour now delegated to quick.Append:
 // naming an already-locked linter must not duplicate it in the enable list.
 func TestMergeReEnableIsNoOp(t *testing.T) {
-	out, err := standardgo.Merge(standardgo.Config, []byte("linters:\n  enable: [gosec, gosec, dupl]\n"))
+	out, err := standardgo.Merge(
+		t.Context(),
+		standardgo.Config,
+		[]byte("linters:\n  enable: [gosec, gosec, dupl]\n"),
+		standardgo.Project{},
+	)
 	if err != nil {
 		t.Fatalf("re-enabling a locked linter should be allowed: %v", err)
 	}
@@ -165,7 +183,12 @@ func TestMergeRejectsNonStringLintersWithoutPanicking(t *testing.T) {
 				}
 			}()
 
-			if _, err := standardgo.Merge(standardgo.Config, []byte(tc.overlay)); err == nil {
+			if _, err := standardgo.Merge(
+				t.Context(),
+				standardgo.Config,
+				[]byte(tc.overlay),
+				standardgo.Project{},
+			); err == nil {
 				t.Error("expected a parse error for a non-string linter name")
 			}
 		})
@@ -173,22 +196,32 @@ func TestMergeRejectsNonStringLintersWithoutPanicking(t *testing.T) {
 }
 
 func TestMergeIgnoreRequiresPath(t *testing.T) {
-	_, err := standardgo.Merge(standardgo.Config, []byte("ignore:\n  - linters: [gosec]\n"))
+	_, err := standardgo.Merge(
+		t.Context(),
+		standardgo.Config,
+		[]byte("ignore:\n  - linters: [gosec]\n"),
+		standardgo.Project{},
+	)
 	if err == nil {
 		t.Fatal("a pathless ignore is a global disable and must be refused")
 	}
 }
 
 func TestMergeIgnoreRequiresLinters(t *testing.T) {
-	_, err := standardgo.Merge(standardgo.Config, []byte("ignore:\n  - path: \"internal/\"\n"))
+	_, err := standardgo.Merge(
+		t.Context(),
+		standardgo.Config,
+		[]byte("ignore:\n  - path: \"internal/\"\n"),
+		standardgo.Project{},
+	)
 	if err == nil {
 		t.Fatal("an ignore with no linters named must be refused")
 	}
 }
 
 func TestMergeIgnoreAddsExclusion(t *testing.T) {
-	out, err := standardgo.Merge(standardgo.Config, []byte(
-		"ignore:\n  - path: \"internal/legacy/\"\n    linters: [gosec, funcorder]\n"))
+	out, err := standardgo.Merge(t.Context(), standardgo.Config, []byte(
+		"ignore:\n  - path: \"internal/legacy/\"\n    linters: [gosec, funcorder]\n"), standardgo.Project{})
 	if err != nil {
 		t.Fatalf("path-scoped ignore should be allowed: %v", err)
 	}
@@ -198,7 +231,7 @@ func TestMergeIgnoreAddsExclusion(t *testing.T) {
 }
 
 func TestMergeEmptyOverlayIsInert(t *testing.T) {
-	out, err := standardgo.Merge(standardgo.Config, nil)
+	out, err := standardgo.Merge(t.Context(), standardgo.Config, nil, standardgo.Project{})
 	if err != nil {
 		t.Fatalf("an empty overlay must be a no-op: %v", err)
 	}
