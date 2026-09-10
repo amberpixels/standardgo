@@ -100,8 +100,8 @@ github.com/alingse/asasalint v0.0.11 h1:SFwnQXJ49Kx/1GghOFz1XGqHYKp21Kq1nHad/0WQ
 github.com/alingse/asasalint v0.0.11/go.mod h1:nCaoMhw7a9kSJObvQyVzNTPBDbNpdocqrSP7t/cW5+I=
 github.com/alingse/nilnesserr v0.2.0 h1:raLem5KG7EFVb4UIDAXgrv3N2JIaffeKNtcEXkEWd/w=
 github.com/alingse/nilnesserr v0.2.0/go.mod h1:1xJPrXonEtX7wyTq8Dytns5P2hNzoWymVUIaKm4HNFg=
-github.com/amberpixels/k1 v0.2.3 h1:qvnNOIxbXukPh/OBZqVhxMWGL7fo+oDCl+/XaYJ8/sg=
-github.com/amberpixels/k1 v0.2.3/go.mod h1:/IsjZlaz0fqKciCNdYm2IBrNobx7ia0BIhV10Xqz+X4=
+github.com/amberpixels/k1 v0.3.0 h1:RlbmRIAYCpGjfNYvmskEV3Ku/GLyntzMgn9ZmDRxZG0=
+github.com/amberpixels/k1 v0.3.0/go.mod h1:FbxSAe8H+aQ9RVburxYwd07jcSxw6UE4AmOMsHrU0dI=
 github.com/amberpixels/lostfield v0.3.0 h1:5G6DpCRQprdJ7kx91kbdBNoiPzdpQZvF/iGousCwkRo=
 github.com/amberpixels/lostfield v0.3.0/go.mod h1:eQkTUqtLhdfKSEr1kcZ2vtTZuQHkn3xhTP2rP7RfHoE=
 github.com/ashanbrown/forbidigo/v2 v2.3.1 h1:KAZijvQ7zeIBKbhikT4jCm0TLYXC4u78bTiLh/8JROI=

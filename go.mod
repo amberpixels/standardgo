@@ -3,7 +3,7 @@ module github.com/amberpixels/standardgo
 go 1.26.0
 
 require (
-	github.com/amberpixels/k1 v0.2.3
+	github.com/amberpixels/k1 v0.3.0
 	github.com/amberpixels/lostfield v0.3.0
 	github.com/golangci/golangci-lint/v2 v2.13.2
 	go.yaml.in/yaml/v3 v3.0.5
