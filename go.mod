@@ -7,7 +7,7 @@ require (
 	github.com/amberpixels/lostfield v0.3.0
 	github.com/golangci/golangci-lint/v2 v2.13.2
 	go.yaml.in/yaml/v3 v3.0.5
-	golang.org/x/mod v0.40.0
+	golang.org/x/mod v0.41.0
 )
 
 require (
