@@ -16,15 +16,13 @@ const OverlayFile = ".standardgo.yml"
 
 // Overlay is the optional project-local .standardgo.yml.
 //
-// It deliberately cannot change a rule the shared config already sets — in
-// either direction. Making a locked linter stricter is refused just as firmly
-// as making it softer, because "stricter" is not decidable in general
-// (is a different gocritic check set stricter?) while "already configured" is.
-// This mirrors standardrb's extend_config, which drops any cop Standard has
-// already configured.
+// It cannot change a rule the shared config already sets, in either direction:
+// "stricter" is not decidable in general (is a different gocritic check set
+// stricter?) while "already configured" is. standardrb's extend_config drops
+// already-configured cops the same way.
 //
-// The one sanctioned way to get softer is Ignore, and it is path-scoped: a
-// linter may be silenced under a glob, never globally.
+// The only way to get softer is Ignore, which is path-scoped: a linter may be
+// silenced under a glob, never globally.
 type Overlay struct {
 	// Presets are module paths, each naming a module that publishes a
 	// standardgo-preset.yml. A preset is an overlay a project references instead
@@ -126,21 +124,17 @@ func addLinters(lint map[string]any, add []string) {
 		return
 	}
 
-	// The enable list arrives from YAML as []any, so the additions are widened to
-	// match. quick.Append skips values already present, which is exactly the
-	// re-enable-is-a-no-op rule, and interface comparison of two any-wrapped
-	// strings is ordinary string equality.
+	// YAML decodes the enable list as []any, hence widen. quick.Append skips
+	// values already present (any-wrapped strings compare as strings), which is
+	// the re-enable-is-a-no-op rule.
 	enabled, _ := lint["enable"].([]any)
 	lint["enable"] = quick.Append(enabled, widen(add)...)
 }
 
 // widen converts a []string to the []any that YAML round-tripping needs.
-//
-// k1's cast.AsSliceOfAny does this, but its documented contract is to panic when
-// the input is not a slice, and its package doc scopes it to testing "where
-// panics are acceptable". The panic happens to be unreachable for a []string
-// today; that is a property of the current implementation, not a promise. Four
-// obvious lines are the better trade in the one binary every repo runs.
+// Not k1's cast.AsSliceOfAny: its contract is to panic on non-slice input and
+// its package doc scopes it to tests, the wrong promise for a binary every
+// repo runs.
 func widen(ss []string) []any {
 	out := make([]any, len(ss))
 	for i, s := range ss {
@@ -192,14 +186,10 @@ func addSettings(lint, add map[string]any, owners map[string]string, src string)
 
 // addCustomSettings merges plugin settings into the locked custom namespace.
 //
-// `custom` is not one linter's settings, it is the map holding every bundled
-// plugin's. Refusing the key outright would lock every plugin at once,
-// including ones the shared ruleset only declares and never tunes, so the
-// add-never-override rule is applied one level down instead: per plugin.
-//
-// A plugin's own `settings` block stays a unit, exactly like an ordinary
-// linter's settings. Once the shared ruleset tunes a plugin, that plugin is
-// closed. The namespace is the special case, not what sits inside it.
+// `custom` holds every bundled plugin's settings, so refusing the key would
+// lock plugins the shared ruleset only declares and never tunes. The
+// add-never-override rule applies per plugin instead: a plugin's own settings
+// stay a unit, closed once the shared ruleset tunes them.
 func addCustomSettings(settings map[string]any, value any, owners map[string]string, src string) error {
 	add, ok := value.(map[string]any)
 	if !ok {

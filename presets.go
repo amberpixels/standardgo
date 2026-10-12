@@ -23,12 +23,10 @@ const PresetFile = "standardgo-preset.yml"
 // modulePlaceholder is what a preset writes where the linted project's module
 // path belongs.
 //
-// It exists because depguard matches deny entries as import-path prefixes with
-// no globbing, so a shared layering rule cannot name the packages it forbids
-// without knowing the module it is being applied to. That is also why the
-// substitution happens here rather than in depguard: by the time depguard
-// compiles its rules it has no module context left, while standardgo runs in
-// the project root with go.mod next to it.
+// depguard matches deny entries as import-path prefixes with no globbing, so a
+// shared layering rule cannot name the packages it forbids without the module
+// path. It is substituted here because depguard compiles its rules with no
+// module context left, while standardgo runs next to go.mod.
 const modulePlaceholder = "${MODULE}"
 
 // Resolver maps a preset's module path to the directory holding it.

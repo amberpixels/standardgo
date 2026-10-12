@@ -47,9 +47,8 @@ func TestMergeAddsUnconfiguredSettings(t *testing.T) {
 	}
 }
 
-// TestMergeAddsPluginSettings covers the case `custom` made impossible before:
-// the shared ruleset declares lostfield but never tunes it, so supplying its
-// settings is an addition, not an override.
+// TestMergeAddsPluginSettings: the shared ruleset declares lostfield but never
+// tunes it, so supplying its settings is an addition, not an override.
 func TestMergeAddsPluginSettings(t *testing.T) {
 	out, err := standardgo.Merge(t.Context(), standardgo.Config, []byte(
 		"linters:\n  settings:\n    custom:\n      lostfield:\n        settings:\n"+
@@ -93,9 +92,9 @@ func TestMergeRejectsUnknownPlugin(t *testing.T) {
 }
 
 // TestMergeRejectsConfiguredPluginOverride pins the other half of the rule: the
-// namespace is merged per plugin, but a plugin the ruleset has actually tuned
-// is as closed as any ordinary linter. The locked config is synthesised because
-// the real ruleset deliberately configures no plugin today.
+// namespace is merged per plugin, but a plugin the ruleset has tuned is as
+// closed as any ordinary linter. The locked config is synthesised because the
+// real ruleset tunes no plugin.
 func TestMergeRejectsConfiguredPluginOverride(t *testing.T) {
 	locked := []byte(
 		"version: \"2\"\nlinters:\n  settings:\n    custom:\n      lostfield:\n" +
@@ -124,8 +123,7 @@ func TestMergeAddsLinters(t *testing.T) {
 	}
 }
 
-// TestMergeReEnableIsNoOp pins the dedup behaviour now delegated to quick.Append:
-// naming an already-locked linter must not duplicate it in the enable list.
+// TestMergeReEnableIsNoOp pins the dedup quick.Append provides: naming an already-locked linter must not duplicate it in the enable list.
 func TestMergeReEnableIsNoOp(t *testing.T) {
 	out, err := standardgo.Merge(
 		t.Context(),
@@ -161,15 +159,10 @@ func TestMergeReEnableIsNoOp(t *testing.T) {
 	}
 }
 
-// TestMergeRejectsNonStringLintersWithoutPanicking guards the invariant that
-// keeps quick.Append safe here.
-//
-// quick.Append is generic over comparable and we instantiate it with any, so a
-// non-comparable element (a slice or map) would panic with "hash of unhashable
-// type" rather than fail cleanly. That is unreachable only because Overlay
-// declares Enable as []string, which makes yaml.Unmarshal reject anything else
-// before it can reach the append. If that field type is ever widened, these
-// cases turn into panics.
+// TestMergeRejectsNonStringLintersWithoutPanicking guards what keeps
+// quick.Append safe: instantiated with any, it panics on a slice or map element.
+// Only Overlay's []string Enable, enforced by yaml.Unmarshal, keeps those out;
+// widen that field and these cases become panics.
 func TestMergeRejectsNonStringLintersWithoutPanicking(t *testing.T) {
 	for _, tc := range []struct{ name, overlay string }{
 		{"nested list", "linters:\n  enable: [[a, b]]\n"},
